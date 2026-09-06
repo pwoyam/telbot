@@ -2,3 +2,4 @@ python-telegram-bot==21.4
 python-dotenv==1.0.1
 openai==1.40.0
 anthropic==0.34.0
+duckduckgo-search==6.2.0
