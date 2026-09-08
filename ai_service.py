@@ -8,14 +8,14 @@ SYSTEM_PROMPT_EN = "You are a helpful and polite AI assistant that responds in E
 
 MAX_HISTORY_MESSAGES = 10
 
-def _get_language(user_id: int) -> str:
-    return get_user_language(user_id)
+async def _get_language(user_id: int) -> str:
+    return await get_user_language(user_id)
 
-def set_language(user_id: int, lang: str):
-    set_user_language(user_id, lang)
+async def set_language(user_id: int, lang: str):
+    await set_user_language(user_id, lang)
 
-def reset_history(user_id: int):
-    reset_user_history(user_id)
+async def reset_history(user_id: int):
+    await reset_user_history(user_id)
 
 def web_search(query: str, num_results: int = 5) -> str:
     """جستجوی وب با DuckDuckGo"""
@@ -37,18 +37,18 @@ def web_search(query: str, num_results: int = 5) -> str:
         return f"خطا در جستجو: {str(e)}"
 
 async def get_ai_response(user_id: int, user_message: str) -> str:
-    lang = _get_language(user_id)
+    lang = await _get_language(user_id)
     system_prompt = SYSTEM_PROMPT_FA if lang == "fa" else SYSTEM_PROMPT_EN
     
-    save_message(user_id, "user", user_message)
-    history = get_conversation_history(user_id, limit=MAX_HISTORY_MESSAGES)
+    await save_message(user_id, "user", user_message)
+    history = await get_conversation_history(user_id, limit=MAX_HISTORY_MESSAGES)
     
     if AI_PROVIDER == "anthropic":
         reply = await _call_anthropic(history, system_prompt)
     else:
         reply = await _call_openai_compatible(history, system_prompt)
     
-    save_message(user_id, "assistant", reply)
+    await save_message(user_id, "assistant", reply)
     return reply
 
 async def _call_openai_compatible(history: list, system_prompt: str) -> str:

@@ -48,7 +48,7 @@ def get_main_keyboard():
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    upsert_user(user.id, user.username, user.first_name)
+    await upsert_user(user.id, user.username, user.first_name)
     await update.message.reply_text(
         f"سلام {user.first_name} 👋\n\n"
         f"من دستیار هوش مصنوعی شخصی تو هستم.\n\n"
@@ -75,10 +75,10 @@ async def myid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    today_usage = get_today_usage(user_id)
+    today_usage = await get_today_usage(user_id)
     remaining = max(0, DAILY_MESSAGE_LIMIT - today_usage)
 
-    lang = _get_language(user_id)
+    lang = await _get_language(user_id)
     if lang == "fa":
         text = (
             f"📊 **آمار امروز شما:**\n\n"
@@ -110,7 +110,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    reset_history(update.effective_user.id)
+    await reset_history(update.effective_user.id)
     await update.message.reply_text("✅ حافظه‌ی مکالمه پاک شد. می‌تونیم از اول شروع کنیم.")
 
 
@@ -119,7 +119,7 @@ async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
 
     if not args:
-        current_lang = _get_language(user_id)
+        current_lang = await _get_language(user_id)
         lang_name = "فارسی" if current_lang == "fa" else "English"
         await update.message.reply_text(
             f"🌍 زبان فعلی: **{lang_name}**\n\n"
@@ -135,7 +135,7 @@ async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ زبان نامعتبر. فقط `fa` یا `en` مجاز است.", parse_mode=ParseMode.MARKDOWN)
         return
 
-    set_language(user_id, lang)
+    await set_language(user_id, lang)
     lang_name = "فارسی" if lang == "fa" else "English"
     await update.message.reply_text(f"✅ زبان تغییر کرد به: **{lang_name}**", parse_mode=ParseMode.MARKDOWN)
 
@@ -148,11 +148,35 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لطفاً یک سوال برای جستجو بنویسید.\nمثال: `/search هوش مصنوعی`", parse_mode=ParseMode.MARKDOWN)
         return
 
+    # === Rate Limit Check for search ===
+    if not is_admin(user_id):
+        today_usage = await get_today_usage(user_id)
+        if today_usage >= DAILY_MESSAGE_LIMIT:
+            lang = await _get_language(user_id)
+            if lang == "fa":
+                msg = (
+                    f"⚠️ **محدودیت روزانه**\n\n"
+                    f"شما امروز به سقف `{DAILY_MESSAGE_LIMIT}` پیام رسیده‌اید.\n"
+                    f"لطفاً فردا دوباره امتحان کنید. 🙏"
+                )
+            else:
+                msg = (
+                    f"⚠️ **Daily limit reached**\n\n"
+                    f"You have reached the daily limit of `{DAILY_MESSAGE_LIMIT}` messages.\n"
+                    f"Please try again tomorrow. 🙏"
+                )
+            await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
+            return
+
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
     start_time = time.time()
     results = web_search(query)
     end_time = time.time()
+
+    # Increase usage after successful search
+    if not is_admin(user_id):
+        await await increment_today_usage(user_id)
 
     response_time = round(end_time - start_time, 2)
 
@@ -195,13 +219,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
     user_text = update.message.text
-    upsert_user(user_id, user.username, user.first_name)
+    await upsert_user(user_id, user.username, user.first_name)
 
     # === Rate Limit Check ===
     if not is_admin(user_id):
-        today_usage = get_today_usage(user_id)
+        today_usage = await get_today_usage(user_id)
         if today_usage >= DAILY_MESSAGE_LIMIT:
-            lang = _get_language(user_id)
+            lang = await _get_language(user_id)
             if lang == "fa":
                 msg = (
                     f"⚠️ **محدودیت روزانه**\n\n"
@@ -224,7 +248,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         reply = await get_ai_response(user_id, user_text)
         if not is_admin(user_id):
-            increment_today_usage(user_id)
+            await increment_today_usage(user_id)
     except Exception as e:
         logger.exception("AI service error")
         reply = "متاسفانه در حال حاضر مشکلی در پاسخ‌دهی پیش اومده. لطفاً دوباره امتحان کن."
@@ -232,7 +256,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     end_time = time.time()
     response_time = round(end_time - start_time, 2)
 
-    lang = _get_language(user_id)
+    lang = await _get_language(user_id)
     time_text = f"\n\n⏱️ _{response_time} ثانیه_" if lang == "fa" else f"\n\n⏱️ _{response_time}s_"
 
     chunks = split_long_message(reply)
@@ -250,11 +274,11 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     if not query:
         return
 
-    upsert_user(user_id, update.effective_user.username, update.effective_user.first_name)
+    await upsert_user(user_id, update.effective_user.username, update.effective_user.first_name)
 
     # Rate limit for inline
     if not is_admin(user_id):
-        today_usage = get_today_usage(user_id)
+        today_usage = await get_today_usage(user_id)
         if today_usage >= DAILY_MESSAGE_LIMIT:
             await update.inline_query.answer(
                 [InlineQueryResultArticle(
@@ -278,7 +302,7 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         else:
             reply = await get_ai_response(user_id, query)
             if not is_admin(user_id):
-                increment_today_usage(user_id)
+                await increment_today_usage(user_id)
 
         end_time = time.time()
         response_time = round(end_time - start_time, 2)
@@ -302,7 +326,7 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def main():
-    init_db()
+    await init_db()
     builder = Application.builder().token(BOT_TOKEN)
     if PROXY_URL:
         builder = builder.proxy(PROXY_URL).get_updates_proxy(PROXY_URL)
@@ -330,6 +354,7 @@ async def main():
                 listen="0.0.0.0",
                 port=WEBHOOK_PORT,
                 webhook_url=full_url,
+                url_path=webhook_path,
                 secret_token=WEBHOOK_SECRET or None,
                 drop_pending_updates=True,
             )
