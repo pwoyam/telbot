@@ -8,7 +8,6 @@
 import asyncio
 import logging
 import time
-from datetime import datetime
 
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import (
@@ -35,14 +34,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_USER_IDS
+
 
 def get_main_keyboard():
     keyboard = [
         [KeyboardButton("🔄 مکالمه جدید"), KeyboardButton("ℹ️ راهنما")],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -55,12 +57,13 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🌍 تغییر زبان با `/lang en` یا `/lang fa`\n"
         f"💬 استفاده به صورت Inline در چت‌های دیگه\n"
         f"🎨 پاسخ‌های Markdown زیبا\n"
-        f"⏱️ نمایش زمان پاسخ\n\n"
-        f"📊 **محدودیت روزانه:** {DAILY_MESSAGE_LIMIT} پیام\n"
+        f"⏱️ نمایش زمان پاسخ\n"
+        f"📊 محدودیت روزانه: {DAILY_MESSAGE_LIMIT} پیام (ادمین نامحدود)\n\n"
         f"هر سوالی داری بپرس!",
         reply_markup=get_main_keyboard(),
         parse_mode=ParseMode.MARKDOWN
     )
+
 
 async def myid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -69,12 +72,12 @@ async def myid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.MARKDOWN,
     )
 
+
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش آمار استفاده کاربر"""
     user_id = update.effective_user.id
     today_usage = get_today_usage(user_id)
     remaining = max(0, DAILY_MESSAGE_LIMIT - today_usage)
-    
+
     lang = _get_language(user_id)
     if lang == "fa":
         text = (
@@ -90,6 +93,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "**دستورات موجود:**\n\n"
@@ -100,20 +104,20 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "`/stats` — مشاهده آمار مصرف روزانه\n"
         "`/myid` — نمایش آیدی عددی شما\n"
         "`/help` — نمایش این راهنما\n"
-        "`/start` — شروع مجدد\n\n"
-        f"📊 **محدودیت روزانه:** {DAILY_MESSAGE_LIMIT} پیام (بدون محدودیت برای ادمین‌ها)\n\n"
-        "💡 **نکته:** می‌تونی توی هر چتی `@yourbotname سوال` بنویسی تا به صورت Inline جواب بگیری.",
+        "`/start` — شروع مجدد",
         parse_mode=ParseMode.MARKDOWN
     )
+
 
 async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reset_history(update.effective_user.id)
     await update.message.reply_text("✅ حافظه‌ی مکالمه پاک شد. می‌تونیم از اول شروع کنیم.")
 
+
 async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     args = context.args
-    
+
     if not args:
         current_lang = _get_language(user_id)
         lang_name = "فارسی" if current_lang == "fa" else "English"
@@ -125,41 +129,44 @@ async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode=ParseMode.MARKDOWN
         )
         return
-    
+
     lang = args[0].lower()
     if lang not in ["fa", "en"]:
         await update.message.reply_text("❌ زبان نامعتبر. فقط `fa` یا `en` مجاز است.", parse_mode=ParseMode.MARKDOWN)
         return
-    
+
     set_language(user_id, lang)
     lang_name = "فارسی" if lang == "fa" else "English"
     await update.message.reply_text(f"✅ زبان تغییر کرد به: **{lang_name}**", parse_mode=ParseMode.MARKDOWN)
 
+
 async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     query = " ".join(context.args)
-    
+
     if not query:
         await update.message.reply_text("❌ لطفاً یک سوال برای جستجو بنویسید.\nمثال: `/search هوش مصنوعی`", parse_mode=ParseMode.MARKDOWN)
         return
-    
+
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-    
+
     start_time = time.time()
     results = web_search(query)
     end_time = time.time()
-    
+
     response_time = round(end_time - start_time, 2)
-    
+
     await update.message.reply_text(
         f"{results}\n\n⏱️ **زمان پاسخ:** {response_time} ثانیه",
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True
     )
 
+
 TELEGRAM_MAX_MESSAGE_LENGTH = 4096
 
-def split_long_message(text: str, limit: int = TELEGRAM_MAX_MESSAGE_LENGTH) -> list[str]:
+
+def split_long_message(text: str, limit: int = TELEGRAM_MAX_MESSAGE_LENGTH) -> list:
     if len(text) <= limit:
         return [text]
     chunks = []
@@ -173,6 +180,7 @@ def split_long_message(text: str, limit: int = TELEGRAM_MAX_MESSAGE_LENGTH) -> l
         chunks.append(text)
     return chunks
 
+
 async def handle_button_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     if text == "🔄 مکالمه جدید":
@@ -182,13 +190,14 @@ async def handle_button_text(update: Update, context: ContextTypes.DEFAULT_TYPE)
     else:
         await handle_message(update, context)
 
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
     user_text = update.message.text
     upsert_user(user_id, user.username, user.first_name)
-    
-    # ===== بررسی Rate Limit (برای غیر ادمین‌ها) =====
+
+    # === Rate Limit Check ===
     if not is_admin(user_id):
         today_usage = get_today_usage(user_id)
         if today_usage >= DAILY_MESSAGE_LIMIT:
@@ -207,50 +216,43 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
             return
-    
+
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-    
+
     start_time = time.time()
-    
+
     try:
         reply = await get_ai_response(user_id, user_text)
-        # شمارنده را فقط در صورت موفقیت افزایش می‌دهیم
         if not is_admin(user_id):
             increment_today_usage(user_id)
     except Exception as e:
         logger.exception("AI service error")
         reply = "متاسفانه در حال حاضر مشکلی در پاسخ‌دهی پیش اومده. لطفاً دوباره امتحان کن."
-    
+
     end_time = time.time()
     response_time = round(end_time - start_time, 2)
-    
+
     lang = _get_language(user_id)
     time_text = f"\n\n⏱️ _{response_time} ثانیه_" if lang == "fa" else f"\n\n⏱️ _{response_time}s_"
-    
+
     chunks = split_long_message(reply)
     for i, chunk in enumerate(chunks):
         if i == len(chunks) - 1:
-            await update.message.reply_text(
-                chunk + time_text,
-                parse_mode=ParseMode.MARKDOWN
-            )
+            await update.message.reply_text(chunk + time_text, parse_mode=ParseMode.MARKDOWN)
         else:
-            await update.message.reply_text(
-                chunk,
-                parse_mode=ParseMode.MARKDOWN
-            )
+            await update.message.reply_text(chunk, parse_mode=ParseMode.MARKDOWN)
+
 
 async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پاسخ به درخواست‌های Inline"""
     query = update.inline_query.query
     user_id = update.effective_user.id
-    
+
     if not query:
         return
-    
+
     upsert_user(user_id, update.effective_user.username, update.effective_user.first_name)
-    
-    # بررسی Rate Limit برای inline
+
+    # Rate limit for inline
     if not is_admin(user_id):
         today_usage = get_today_usage(user_id)
         if today_usage >= DAILY_MESSAGE_LIMIT:
@@ -266,10 +268,10 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 cache_time=300
             )
             return
-    
+
     try:
         start_time = time.time()
-        
+
         if query.lower().startswith("search "):
             search_query = query[7:]
             reply = web_search(search_query)
@@ -277,13 +279,13 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             reply = await get_ai_response(user_id, query)
             if not is_admin(user_id):
                 increment_today_usage(user_id)
-        
+
         end_time = time.time()
         response_time = round(end_time - start_time, 2)
-        
+
         results = [
             InlineQueryResultArticle(
-                id=user_id,
+                id=str(user_id),
                 title="💬 پاسخ هوش مصنوعی",
                 description=reply[:100] + "..." if len(reply) > 100 else reply,
                 input_message_content=InputTextMessageContent(
@@ -292,11 +294,12 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 )
             )
         ]
-        
+
         await update.inline_query.answer(results, cache_time=1)
-        
+
     except Exception as e:
         logger.exception("Inline query error")
+
 
 async def main():
     init_db()
@@ -304,7 +307,7 @@ async def main():
     if PROXY_URL:
         builder = builder.proxy(PROXY_URL).get_updates_proxy(PROXY_URL)
     application = builder.build()
-    
+
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("reset", reset_command))
@@ -314,16 +317,15 @@ async def main():
     application.add_handler(CommandHandler("search", search_command))
     application.add_handler(InlineQueryHandler(inline_query_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_button_text))
-    
+
     async with application:
         await application.start()
-        
+
         if USE_WEBHOOK and WEBHOOK_URL:
-            # حالت Webhook - مناسب برای سرور با SSL
+            # === WEBHOOK MODE (Production) ===
             webhook_path = f"/webhook/{BOT_TOKEN}"
             full_url = f"{WEBHOOK_URL}{webhook_path}"
-            
-            logger.info(f"🌐 شروع ربات با Webhook: {full_url}")
+            logger.info(f"🌐 Starting bot with Webhook: {full_url}")
             await application.updater.start_webhook(
                 listen="0.0.0.0",
                 port=WEBHOOK_PORT,
@@ -332,13 +334,17 @@ async def main():
                 drop_pending_updates=True,
             )
         else:
-            # حالت Polling - مناسب برای توسعه محلی
-            logger.info("🔄 شروع ربات با Polling...")
-            await application.updater.start_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
-        
+            # === POLLING MODE (Development) ===
+            logger.info("🔄 Starting bot with Polling...")
+            await application.updater.start_polling(
+                allowed_updates=Update.ALL_TYPES,
+                drop_pending_updates=True
+            )
+
         logger.info("✅ ربات با موفقیت اجرا شد. برای توقف Ctrl+C بزنید.")
         stop_event = asyncio.Event()
         await stop_event.wait()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

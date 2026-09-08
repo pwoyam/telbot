@@ -42,11 +42,10 @@ def init_db():
                 PRIMARY KEY (user_id, usage_date)
             )
         """)
-        # اضافه کردن ستون language به users اگر از قبل موجود نیست
         try:
             conn.execute("ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'fa'")
         except sqlite3.OperationalError:
-            pass  # ستون از قبل وجود دارد
+            pass
         conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id)")
 
 def upsert_user(user_id: int, username: str, first_name: str):
@@ -70,21 +69,7 @@ def save_message(user_id: int, role: str, content: str):
             (user_id, role, content, datetime.datetime.utcnow().isoformat()),
         )
 
-def get_user_messages(user_id: int, limit: int = 50):
-    with get_conn() as conn:
-        return conn.execute(
-            """
-            SELECT role, content, created_at 
-            FROM messages 
-            WHERE user_id = ? 
-            ORDER BY id DESC 
-            LIMIT ?
-            """,
-            (user_id, limit),
-        ).fetchall()
-
-def get_conversation_history(user_id: int, limit: int = 10) -> list[dict]:
-    """گرفتن تاریخچه مکالمه از دیتابیس (به ترتیب زمانی)"""
+def get_conversation_history(user_id: int, limit: int = 10) -> list:
     with get_conn() as conn:
         rows = conn.execute(
             """
@@ -96,11 +81,9 @@ def get_conversation_history(user_id: int, limit: int = 10) -> list[dict]:
             """,
             (user_id, limit),
         ).fetchall()
-        # برعکس کردن چون DESC گرفتیم
         return [{"role": row["role"], "content": row["content"]} for row in reversed(rows)]
 
 def reset_user_history(user_id: int):
-    """پاک کردن کامل تاریخچه مکالمه کاربر"""
     with get_conn() as conn:
         conn.execute("DELETE FROM messages WHERE user_id=?", (user_id,))
 

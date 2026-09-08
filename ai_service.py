@@ -40,10 +40,7 @@ async def get_ai_response(user_id: int, user_message: str) -> str:
     lang = _get_language(user_id)
     system_prompt = SYSTEM_PROMPT_FA if lang == "fa" else SYSTEM_PROMPT_EN
     
-    # ذخیره پیام کاربر
     save_message(user_id, "user", user_message)
-    
-    # گرفتن تاریخچه از دیتابیس
     history = get_conversation_history(user_id, limit=MAX_HISTORY_MESSAGES)
     
     if AI_PROVIDER == "anthropic":
@@ -51,11 +48,10 @@ async def get_ai_response(user_id: int, user_message: str) -> str:
     else:
         reply = await _call_openai_compatible(history, system_prompt)
     
-    # ذخیره پاسخ AI
     save_message(user_id, "assistant", reply)
     return reply
 
-async def _call_openai_compatible(history: list[dict], system_prompt: str) -> str:
+async def _call_openai_compatible(history: list, system_prompt: str) -> str:
     from openai import AsyncOpenAI
     client = AsyncOpenAI(api_key=AI_API_KEY, base_url=AI_BASE_URL or None)
     messages = [{"role": "system", "content": system_prompt}] + history
@@ -66,7 +62,7 @@ async def _call_openai_compatible(history: list[dict], system_prompt: str) -> st
     )
     return response.choices[0].message.content
 
-async def _call_anthropic(history: list[dict], system_prompt: str) -> str:
+async def _call_anthropic(history: list, system_prompt: str) -> str:
     from anthropic import AsyncAnthropic
     client = AsyncAnthropic(api_key=AI_API_KEY, base_url=AI_BASE_URL or None)
     response = await client.messages.create(
