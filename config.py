@@ -1,47 +1,70 @@
-"""
-تنظیمات اصلی پروژه
-همه‌ی مقادیر حساس از فایل .env خوانده می‌شوند
-"""
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- تلگرام ---
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-# آیدی عددی کاربرانی که ادمین هستن (با کاما جدا کنید، مثلاً: 111111,222222)
 ADMIN_USER_IDS = [
     int(uid.strip()) for uid in os.getenv("ADMIN_USER_IDS", "").split(",") if uid.strip()
 ]
 
-# --- هوش مصنوعی ---
-# provider: "openai" یا "anthropic" یا هر reseller سازگار با OpenAI
-AI_PROVIDER = os.getenv("AI_PROVIDER", "openai")
+AI_PROVIDER = os.getenv("AI_PROVIDER", "deepseek")
 AI_API_KEY = os.getenv("AI_API_KEY", "")
-AI_BASE_URL = os.getenv("AI_BASE_URL", "")  # برای reseller های ایرانی یا proxy، آدرس سفارشی
-AI_MODEL = os.getenv("AI_MODEL", "gpt-4o-mini")
+AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.deepseek.com/v1")
+AI_MODEL = os.getenv("AI_MODEL", "deepseek-chat")
+AI_TIMEOUT = float(os.getenv("AI_TIMEOUT", "30.0"))
+AI_MAX_RETRIES = int(os.getenv("AI_MAX_RETRIES", "2"))
 
-# --- زرین‌پال ---
-ZARINPAL_MERCHANT_ID = os.getenv("ZARINPAL_MERCHANT_ID", "")
-ZARINPAL_SANDBOX = os.getenv("ZARINPAL_SANDBOX", "true").lower() == "true"
-# آدرس عمومی سرور شما که کالبک پرداخت به آن برمی‌گردد (باید https باشد)
-CALLBACK_BASE_URL = os.getenv("CALLBACK_BASE_URL", "https://yourdomain.com")
-
-# --- اشتراک ---
-SUBSCRIPTION_PRICE_TOMAN = int(os.getenv("SUBSCRIPTION_PRICE_TOMAN", "99000"))
-SUBSCRIPTION_DAYS = int(os.getenv("SUBSCRIPTION_DAYS", "30"))
-FREE_DAILY_MESSAGES = int(os.getenv("FREE_DAILY_MESSAGES", "5"))  # تعداد پیام رایگان روزانه
-
-# --- دیتابیس ---
 DATABASE_PATH = os.getenv("DATABASE_PATH", "bot_database.db")
-
-# --- وب سرور کالبک (برای زرین‌پال) ---
-WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "0.0.0.0")
-WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8080"))
-
-# --- پنل ادمین ---
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "changeme123")  # حتماً عوضش کن
-ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY", "super-secret-key-change-me")  # برای سشن
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "changeme123")
-ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY", "super-secret-key-change-me")
 PROXY_URL = os.getenv("PROXY_URL", "")
+
+DAILY_MESSAGE_LIMIT = int(os.getenv("DAILY_MESSAGE_LIMIT", "50"))
+
+USE_WEBHOOK = os.getenv("USE_WEBHOOK", "false").lower() == "true"
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
+WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8443"))
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
+
+CACHE_DB_PATH = os.getenv("CACHE_DB_PATH", "cache_database.db")
+CACHE_TTL_AI = int(os.getenv("CACHE_TTL_AI", "3600"))
+CACHE_TTL_SEARCH = int(os.getenv("CACHE_TTL_SEARCH", "900"))
+CACHE_MAX_ENTRIES = int(os.getenv("CACHE_MAX_ENTRIES", "1000"))
+
+HEALTH_PORT = int(os.getenv("HEALTH_PORT", "9090"))  # Changed from 8080 (already in use)
+HEALTH_HOST = os.getenv("HEALTH_HOST", "0.0.0.0")
+
+STRUCTURED_LOGGING = os.getenv("STRUCTURED_LOGGING", "false").lower() == "true"
+
+# Admin Panel
+ADMIN_PANEL_PORT = int(os.getenv("ADMIN_PANEL_PORT", "8081"))
+ADMIN_PANEL_HOST = os.getenv("ADMIN_PANEL_HOST", "0.0.0.0")
+ADMIN_PANEL_USERNAME = os.getenv("ADMIN_PANEL_USERNAME", "admin")
+ADMIN_PANEL_PASSWORD = os.getenv("ADMIN_PANEL_PASSWORD", "")
+
+SUPPORTED_PROVIDERS = {"openai", "anthropic", "deepseek"}
+
+
+def validate_config():
+    missing = []
+    if not BOT_TOKEN:
+        missing.append("BOT_TOKEN")
+    if not AI_API_KEY:
+        missing.append("AI_API_KEY")
+    if AI_PROVIDER not in SUPPORTED_PROVIDERS:
+        raise ValueError(
+            f"Invalid AI_PROVIDER '{AI_PROVIDER}'. Must be one of: {SUPPORTED_PROVIDERS}"
+        )
+    if USE_WEBHOOK:
+        if not WEBHOOK_URL:
+            missing.append("WEBHOOK_URL (required when USE_WEBHOOK=true)")
+        if not WEBHOOK_SECRET:
+            missing.append("WEBHOOK_SECRET (required when USE_WEBHOOK=true)")
+    # نکته: پنل ادمین وب (ADMIN_PANEL_*) در این نسخه از کد پیاده‌سازی نشده؛
+    # پنل ادمین فعلی از طریق دستور تلگرام /admin کار می‌کند و نیازی به
+    # این متغیرها ندارد. اگر بعداً یک وب‌سرور ادمین جداگانه اضافه کردید،
+    # این چک را دوباره فعال کنید.
+    if missing:
+        raise RuntimeError(
+            f"Missing required environment variables: {', '.join(missing)}"
+        )
+    print("✅ Configuration validated")
